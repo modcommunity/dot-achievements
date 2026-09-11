@@ -12,28 +12,17 @@ This asset, along with all the others, was built initially with **Claude Code** 
 I intend on reviewing code, testing, and editing documentation regularly. If you're interested in helping out, please let me know!
 
 ## Achievements
-**Rules over per-player numbers, declared once.** Counters, bests, tiers, hidden and
-secret entries, progress bars that do not lie, a pluggable store, and a batched
-reporter for the TMC backbone.
+**Rules over per-player numbers, declared once.** Counters, bests, tiers, hidden and secret entries, progress bars that do not lie, a pluggable store, and a batched reporter for the TMC backbone.
 
 ## Why
 
-An achievement whose condition lives inside the code that awards it is one nobody can
-list, show progress towards, or check a save file against. Stating it as data instead
-means a server can validate the whole catalogue at boot, decide what somebody has
-earned, and report it — **without loading a mesh, an icon or a scene**, which is the
-same reason dot-loadout and dot-user-avatar are documents rather than objects.
+An achievement whose condition lives inside the code that awards it is one nobody can list, show progress towards, or check a save file against. Stating it as data instead means a server can validate the whole catalogue at boot, decide what somebody has earned, and report it — **without loading a mesh, an icon or a scene**, which is the same reason dot-loadout and dot-user-avatar are documents rather than objects.
 
 ## Installing
 
-Copy `addons/dot_achievements/` and
-[`dot-core`](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your
-project and enable dot-achievements in *Project → Project Settings → Plugins*.
+Copy `addons/dot_achievements/` and [`dot-core`](https://github.com/modcommunity/dot-core)'s `addons/dot_core/` into your project and enable dot-achievements in *Project → Project Settings → Plugins*.
 
-[dot-stats](https://github.com/modcommunity/dot-stats) is optional and is the natural
-source of the numbers; `DotAchievementStatsLink` bridges to it without naming it.
-[dot-auth](https://github.com/modcommunity/dot-auth) supplies the backbone client and
-is likewise not named anywhere in the source. Requires Godot 4.7 or newer.
+[dot-stats](https://github.com/modcommunity/dot-stats) is optional and is the natural source of the numbers; `DotAchievementStatsLink` bridges to it without naming it. [dot-auth](https://github.com/modcommunity/dot-auth) supplies the backbone client and is likewise not named anywhere in the source. Requires Godot 4.7 or newer.
 
 ## Five minutes
 
@@ -59,8 +48,7 @@ tracker.record(player_key, &"kills", 1)
 await tracker.end(player_key)           # saves
 ```
 
-`record()` merges by the kind the rule declared — a counter adds, a best keeps the
-better — so one call serves every stat and a game cannot get it the wrong way round.
+`record()` merges by the kind the rule declared — a counter adds, a best keeps the better — so one call serves every stat and a game cannot get it the wrong way round.
 
 ## With dot-stats
 
@@ -71,11 +59,7 @@ link.stats = stats_tracker
 add_child(link)
 ```
 
-dot-stats' `recorded` signal carries a player's **session** total, and an achievement
-is about a lifetime. Wiring the signal straight into `record()` adds the running
-session total on every kill — two after the second, five after the third, nine after
-the fourth. The link holds a baseline and files the difference, and treats a total
-that goes down as a new session rather than as a negative delta.
+dot-stats' `recorded` signal carries a player's **session** total, and an achievement is about a lifetime. Wiring the signal straight into `record()` adds the running session total on every kill — two after the second, five after the third, nine after the fourth. The link holds a baseline and files the difference, and treats a total that goes down as a new session rather than as a negative delta.
 
 ## Showing them
 
@@ -84,9 +68,7 @@ for row in tracker.listing(player_key):
     print(row["name"], row.get("progress", row.get("unlocked")))
 ```
 
-Hidden entries are absent until earned and secret ones arrive without their
-description — filtered here rather than in a UI, because a description withheld by
-the interface that drew it was still sent to the client.
+Hidden entries are absent until earned and secret ones arrive without their description — filtered here rather than in a UI, because a description withheld by the interface that drew it was still sent to the client.
 
 ## Validating
 
