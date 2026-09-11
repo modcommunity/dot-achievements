@@ -16,7 +16,7 @@ I intend on reviewing code, testing, and editing documentation regularly. If you
 
 ## Why
 
-An achievement whose condition lives inside the code that awards it is one nobody can list, show progress towards, or check a save file against. Stating it as data instead means a server can validate the whole catalogue at boot, decide what somebody has earned, and report it — **without loading a mesh, an icon or a scene**, which is the same reason dot-loadout and dot-user-avatar are documents rather than objects.
+An achievement whose condition lives inside the code that awards it is one nobody can list, show progress towards, or check a save file against. Stating it as data instead means a server can validate the whole catalogue at boot, decide what somebody has earned, and report it, **without loading a mesh, an icon or a scene**. That is the same reason dot-loadout and dot-user-avatar are documents rather than objects.
 
 ## Installing
 
@@ -48,7 +48,7 @@ tracker.record(player_key, &"kills", 1)
 await tracker.end(player_key)           # saves
 ```
 
-`record()` merges by the kind the rule declared — a counter adds, a best keeps the better — so one call serves every stat and a game cannot get it the wrong way round.
+`record()` merges by the kind the rule declared, so a counter adds and a best keeps the better. One call serves every stat, and a game cannot get it the wrong way round.
 
 ## With dot-stats
 
@@ -59,7 +59,7 @@ link.stats = stats_tracker
 add_child(link)
 ```
 
-dot-stats' `recorded` signal carries a player's **session** total, and an achievement is about a lifetime. Wiring the signal straight into `record()` adds the running session total on every kill — two after the second, five after the third, nine after the fourth. The link holds a baseline and files the difference, and treats a total that goes down as a new session rather than as a negative delta.
+dot-stats' `recorded` signal carries a player's **session** total, and an achievement is about a lifetime. Wiring the signal straight into `record()` adds the running session total on every kill: two after the second, five after the third, nine after the fourth. The link holds a baseline and files the difference, and treats a total that goes down as a new session rather than as a negative delta.
 
 ## Showing them
 
@@ -68,7 +68,7 @@ for row in tracker.listing(player_key):
     print(row["name"], row.get("progress", row.get("unlocked")))
 ```
 
-Hidden entries are absent until earned and secret ones arrive without their description — filtered here rather than in a UI, because a description withheld by the interface that drew it was still sent to the client.
+Hidden entries are absent until earned, and secret ones arrive without their description. The filtering happens here rather than in a UI, because a description withheld by the interface that drew it was still sent to the client.
 
 ## Validating
 
