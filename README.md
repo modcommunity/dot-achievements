@@ -77,3 +77,7 @@ godot --headless --path . --import
 godot --headless --path . res://examples/achievements_selftest.tscn
 # 136 checks, all offline. Exits non-zero on any failure.
 ```
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
