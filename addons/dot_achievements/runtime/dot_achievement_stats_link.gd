@@ -26,7 +26,9 @@ extends Node
 ## lowest or a latest is an absolute value in both systems and is passed through
 ## unchanged — differencing a personal best would be meaningless.
 
-const CHANNEL := "achievements"
+# No log channel: a signal adapter. start() returns a DotResult that every host in the
+# family checks, and a reading for a player the tracker does not hold is dropped by
+# design -- the tracker has not loaded them, and filing it would be the bug.
 
 @export var register_as: StringName = &""
 

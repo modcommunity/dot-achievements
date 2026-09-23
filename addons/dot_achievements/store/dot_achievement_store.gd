@@ -46,14 +46,64 @@ func _save_progress(_player: String, _progress: DotAchievementProgress) -> DotRe
 	)
 
 
+## Whether the last save failed, so an outage is reported on its EDGES.
+##
+## The tracker keeps a failed save dirty and tries again at every autosave, which is
+## right, and means a store that is down for ten minutes fails once per dirty player
+## per interval. A WARN for each of those buries the first one.
+var _saves_failing: bool = false
+
+
+## Logged here because every store passes through it, and because the tracker only
+## emits [code]load_failed[/code] -- which no game in the family is connected to.
+##
+## ERROR: the tracker refuses to file readings for a player it could not load, so
+## nothing that player does this session counts toward an achievement.
 func load_progress(player: String) -> DotResult:
 	var res: DotResult = await _load_progress(player)
+
+	if not res.ok:
+		DotLog.error(CHANNEL, "a player's achievement progress could not be read", {
+			"store": _store_name(),
+			"player": player.substr(0, 16),
+			"code": res.code(),
+			"error": res.error.message if res.error != null else "",
+		})
+
 	return res
 
 
+## WARN on the first failure, DEBUG while it lasts, INFO when a save lands again:
+## nothing is lost yet -- the progress stays dirty and is retried -- but a store that
+## never comes back loses it all at shutdown, and somebody should look.
 func save_progress(player: String, progress: DotAchievementProgress) -> DotResult:
 	var res: DotResult = await _save_progress(player, progress)
+
+	if not res.ok:
+		var fields := {
+			"store": _store_name(),
+			"player": player.substr(0, 16),
+			"code": res.code(),
+			"error": res.error.message if res.error != null else "",
+		}
+
+		if _saves_failing:
+			DotLog.debug(CHANNEL, "achievement progress still not saving", fields)
+		else:
+			DotLog.warn(CHANNEL, "achievement progress is not saving; it will be retried", fields)
+
+		_saves_failing = true
+	elif _saves_failing:
+		_saves_failing = false
+		DotLog.info(CHANNEL, "achievement progress is saving again", {"store": _store_name()})
+
 	return res
+
+
+func _store_name() -> String:
+	var script: Script = get_script()
+	var named := script.get_global_name() if script != null else &""
+	return String(named) if named != &"" else "DotAchievementStore"
 
 
 ## Whether this store can be used at all. Overridden by stores with a connection.

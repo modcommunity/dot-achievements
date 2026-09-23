@@ -16,7 +16,8 @@ extends Resource
 ## second — so the catalogue builds [code]stat -> achievements[/code] once and the
 ## tracker evaluates only what the stat touches.
 
-const CHANNEL := "achievements"
+# No log channel: a document. Parsing and validation return a DotResult, and the tracker
+# that loads it at start wraps and returns the failure to its host.
 
 @export var achievements: Array[DotAchievement] = []
 

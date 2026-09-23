@@ -76,6 +76,13 @@ var last_error: String = ""
 var _queue: Array[Dictionary] = []
 var _defined: bool = false
 
+# Edge state for the log, so a condition that lasts is said once when it starts and
+# once when it ends, rather than on every flush or every unlock while it holds.
+var _failing: bool = false
+var _warned_overflow: bool = false
+var _warned_no_client: bool = false
+var _warned_account_key: bool = false
+
 
 static func with_client(p_client: Object) -> DotAchievementReporter:
 	var out := DotAchievementReporter.new()
@@ -110,6 +117,14 @@ static func is_player_key(candidate: String) -> bool:
 ## Adds one unlock to the queue. Never blocks and never fails a game.
 func queue(player: String, id: StringName, at: int) -> DotResult:
 	if not is_player_key(player):
+		# Once per reporter: the tracker drops this result, and a game passing account
+		# ids is a game none of whose unlocks will ever be reported. WARN, because it is
+		# an integration mistake somebody has to fix, and it will not fix itself.
+		if not _warned_account_key:
+			_warned_account_key = true
+			DotLog.warn(CHANNEL, "refusing a player key that is not a pseudonym; unlocks for such keys are not reported", {
+				"key": player.substr(0, 16),
+			})
 		return DotResult.fail(
 			DotError.CODE_INVALID,
 			"A player key must be a pseudonymous scoped key, not an account id.",
@@ -133,6 +148,14 @@ func queue(player: String, id: StringName, at: int) -> DotResult:
 		_queue.remove_at(0)
 		dropped += 1
 
+		# Once until the next successful flush. Unlocks are being thrown away, which is
+		# either an outage outlasting the queue or nothing calling flush() at all.
+		if not _warned_overflow:
+			_warned_overflow = true
+			DotLog.warn(CHANNEL, "the unlock queue is full; the oldest are being dropped", {
+				"limit": queue_limit, "sent": sent, "failures": failures,
+			})
+
 	return DotResult.success(_queue.size())
 
 
@@ -151,6 +174,10 @@ func define(catalogue: DotAchievementCatalogue, app: String = "") -> DotResult:
 	var res: DotResult = await backbone.call("post_integration", DEFINE_PATH, body)
 	if res.ok:
 		_defined = true
+	else:
+		# WARN: unlocks still report without it; what is lost is a site showing the
+		# achievements nobody has earned yet.
+		DotLog.result(CHANNEL, "the achievement catalogue was not declared", res, DotLog.Level.WARN)
 
 	return res
 
@@ -162,6 +189,11 @@ func flush() -> DotResult:
 
 	var backbone := _client()
 	if backbone == null:
+		if not _warned_no_client:
+			_warned_no_client = true
+			DotLog.warn(CHANNEL, "unlocks are queued and there is no backbone client to send them", {
+				"service": String(client_service), "pending": _queue.size(),
+			})
 		return DotResult.fail(
 			DotError.CODE_STATE, "No backbone client is available."
 		)
@@ -188,13 +220,37 @@ func flush() -> DotResult:
 			if res.error != null and res.error.is_retryable():
 				for i in range(batch.size() - 1, -1, -1):
 					_queue.push_front(batch[i])
+
+				# Retryable: nothing is lost yet, so the outage is reported on its
+				# edges -- WARN when it starts, DEBUG while every flush repeats it.
+				if _failing:
+					DotLog.debug(CHANNEL, "unlock reporting still failing", {
+						"pending": _queue.size(), "error": last_error,
+					})
+				else:
+					DotLog.warn(CHANNEL, "unlock reporting is failing; the batch will be retried", {
+						"pending": _queue.size(), "error": last_error,
+					})
+				_failing = true
 			else:
 				dropped += batch.size()
+				# ERROR every time: these unlocks are gone, and a refusal the backbone
+				# will not retry is usually a contract or a scope the operator can fix.
+				DotLog.error(CHANNEL, "the backbone refused unlocks; the batch was dropped", {
+					"dropped": batch.size(), "error": last_error, "scope": SCOPE_WRITE,
+				})
 
 			return res.wrap("Could not report achievement unlocks.")
 
 		sent += batch.size()
 		total += batch.size()
+
+	if _failing:
+		_failing = false
+		DotLog.info(CHANNEL, "unlock reporting recovered", {"sent": total})
+
+	_warned_overflow = false
+	_warned_no_client = false
 
 	return DotResult.success(total)
 
