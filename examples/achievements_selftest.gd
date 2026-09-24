@@ -435,6 +435,9 @@ func _test_stores() -> void:
 	)
 
 	var directory := "user://dot_achievements_selftest"
+	# From nothing, every run: "a player with no file is a fresh player" and every
+	# save-then-load below mean nothing against a directory the last run left full.
+	DotPaths.remove_tree(directory)
 	var file := DotAchievementStoreFile.new(directory)
 
 	# Two keys that slugify identically. dot-timer shipped exactly this: surf_kitsune2
