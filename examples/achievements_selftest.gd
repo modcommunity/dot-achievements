@@ -12,8 +12,8 @@ extends Node
 ## godot --headless --path . res://examples/achievements_selftest.tscn
 ## [/codeblock]
 
-const SECTIONS := 11
-const CHECKS := 136
+const SECTIONS := 12
+const CHECKS := 147
 
 var _passed := 0
 var _failed := 0
@@ -97,6 +97,7 @@ func _run() -> void:
 	await _test_listing()
 	await _test_stats_link()
 	await _test_reporter()
+	await _test_tracker_reports()
 	await _test_saving()
 
 	_line("")
@@ -748,6 +749,129 @@ func _test_reporter() -> void:
 	_check(not homeless.is_available(), "a reporter with no client is not available")
 	var nowhere: DotResult = await homeless.flush()
 	_check(nowhere.ok, "and flushing an empty queue is not a failure")
+
+
+func _calls_to(backbone: FakeBackbone, path: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for call in backbone.calls:
+		if str(call.get("path", "")) == path:
+			out.append(call)
+	return out
+
+
+func _wait(seconds: float) -> void:
+	await get_tree().create_timer(seconds).timeout
+
+
+## The tracker drives the reporter. Nothing did until it did: with report_to_backbone on,
+## every unlock was queued, nothing ever called define() or flush(), and the queue limit
+## dropped them. So this goes through the tracker's own timer, to a fake backbone, and
+## never calls the reporter by hand.
+func _test_tracker_reports() -> void:
+	_section("the tracker reports unlocks")
+
+	var backbone := FakeBackbone.new()
+	var tracker := _tracker()
+	tracker.report_to_backbone = true
+	tracker.report_interval = 0.05
+	tracker.report_app = "selftest"
+	tracker.reporter = DotAchievementReporter.with_client(backbone)
+
+	await tracker.begin("u_ada")
+	# Ten kills earn two: k10, and flawless (five kills, no deaths).
+	tracker.record("u_ada", &"kills", 10.0)
+	_check(tracker.reporter.pending() == 2, "the unlocks are queued")
+
+	await _wait(0.3)
+
+	var defines := _calls_to(backbone, DotAchievementReporter.DEFINE_PATH)
+	var unlocks := _calls_to(backbone, DotAchievementReporter.UNLOCK_PATH)
+	_check(
+		defines.size() == 1
+		and (defines[0]["body"]["achievements"] as Array).size() == tracker.catalogue.size()
+		and str(defines[0]["body"].get("app", "")) == "selftest",
+		"the catalogue is declared, whole, with the app id"
+	)
+	var keys: Array[String] = []
+	if unlocks.size() == 1:
+		for row in unlocks[0]["body"]["unlocks"]:
+			if str(row.get("player", "")) == "u_ada":
+				keys.append(str(row.get("key", "")))
+	keys.sort()
+	_check(
+		keys.size() == 2 and keys[0] == "flawless" and keys[1] == "k10",
+		"and the unlocks reach the backbone on the tracker's own timer, in one batch"
+	)
+	_check(
+		tracker.reporter.pending() == 0 and tracker.reporter.sent == 2,
+		"leaving nothing queued"
+	)
+
+	tracker.record("u_ada", &"kills", 90.0)
+	await _wait(0.3)
+	_check(
+		_calls_to(backbone, DotAchievementReporter.DEFINE_PATH).size() == 1,
+		"the catalogue is declared once, not on every send"
+	)
+	_check(
+		_calls_to(backbone, DotAchievementReporter.UNLOCK_PATH).size() == 2
+		and tracker.reporter.sent == 3,
+		"a later unlock goes out on a later tick"
+	)
+	tracker.queue_free()
+
+	# A backbone that is down: the declaration is retried later, and the unlock is kept.
+	var down := FakeBackbone.new()
+	down.fail = true
+	down.retryable = true
+	var patient := _tracker()
+	patient.report_to_backbone = true
+	patient.report_interval = 0.05
+	patient.reporter = DotAchievementReporter.with_client(down)
+
+	await patient.begin("u_bo")
+	patient.unlock("u_bo", &"opening_day")
+	await _wait(0.12)
+	_check(
+		patient.reporter.pending() == 1 and patient.reporter.sent == 0,
+		"while the backbone is down the unlock stays queued"
+	)
+
+	down.fail = false
+	await _wait(0.5)
+	_check(
+		_calls_to(down, DotAchievementReporter.DEFINE_PATH).size() >= 2,
+		"the declaration is retried once it is back"
+	)
+	_check(
+		patient.reporter.pending() == 0 and patient.reporter.sent == 1,
+		"and the kept unlock is delivered"
+	)
+	patient.queue_free()
+
+	# Off means off: nothing is queued and nothing is sent.
+	var quiet_backbone := FakeBackbone.new()
+	var quiet := _tracker()
+	quiet.reporter = DotAchievementReporter.with_client(quiet_backbone)
+	quiet.report_interval = 0.05
+	await quiet.begin("u_cy")
+	quiet.record("u_cy", &"kills", 10.0)
+	await _wait(0.15)
+	_check(
+		quiet_backbone.calls.is_empty() and quiet.reporter.pending() == 0,
+		"with report_to_backbone off, nothing is queued or sent"
+	)
+
+	# A host can send on demand, e.g. before a shutdown.
+	quiet.report_to_backbone = true
+	quiet.report_interval = 600.0
+	quiet.record("u_cy", &"kills", 90.0)
+	var sent: DotResult = await quiet.report()
+	_check(
+		sent.ok and int(sent.value) == 1 and quiet.reporter.sent == 1,
+		"report() sends what is queued without waiting for the timer"
+	)
+	quiet.queue_free()
 
 
 func _test_saving() -> void:

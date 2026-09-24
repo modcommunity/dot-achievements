@@ -66,7 +66,20 @@ signal save_failed(player: String, error: DotError)
 @export var register_as: StringName = SERVICE
 
 ## Report unlocks to the backbone through [member reporter].
+##
+## [b]The tracker is what drives the reporter, on [member report_interval].[/b] It used
+## to only queue: nothing in the family called [method DotAchievementReporter.define] or
+## [method DotAchievementReporter.flush], so with this on every unlock sat in the queue
+## until the queue limit dropped it. The tracker is the owner because it is the one node
+## a host already places, and the family has no autoload to hang a timer on.
 @export var report_to_backbone: bool = false
+
+## Seconds between sends of queued unlocks. Batched rather than sent per unlock: a
+## round's end can award a dozen at once, and one request carries them all.
+@export_range(1.0, 600.0, 1.0) var report_interval: float = 10.0
+
+## The app id sent with the catalogue declaration. Empty sends none.
+@export var report_app: String = ""
 
 ## Where progress lives. Defaults to memory — see [DotAchievementStoreMemory] for
 ## why that rather than a file.
@@ -79,6 +92,16 @@ var _players: Dictionary = {}
 var _fractions: Dictionary = {}
 var _autosave_left: float = 0.0
 var _started: bool = false
+
+var _report_left: float = 0.0
+var _reporting: bool = false
+
+# Declaring the catalogue is once per process, retried on a doubling delay while the
+# backbone cannot be reached, and not at all after a refusal it will not retry (a scope
+# or a contract the operator has to fix -- the reporter has already said so at WARN).
+var _define_due: bool = true
+var _define_wait: float = 0.0
+var _define_backoff: float = 0.0
 
 
 func _ready() -> void:
@@ -119,8 +142,11 @@ func start() -> DotResult:
 		DotRegistry.register(register_as, self)
 
 	_autosave_left = autosave_interval
+	_report_left = report_interval
 	_started = true
-	set_process(autosave_interval > 0.0)
+	# Always on: [member report_to_backbone] may be turned on after start, and both
+	# halves of [method _process] return at once when they have nothing to do.
+	set_process(true)
 
 	DotLog.info(CHANNEL, "achievement tracker ready", {
 		"achievements": catalogue.size(),
@@ -132,6 +158,8 @@ func start() -> DotResult:
 
 
 func _process(delta: float) -> void:
+	_tick_report(delta)
+
 	if autosave_interval <= 0.0:
 		return
 
@@ -141,6 +169,56 @@ func _process(delta: float) -> void:
 
 	_autosave_left = autosave_interval
 	_save_dirty()
+
+
+func _tick_report(delta: float) -> void:
+	if not report_to_backbone or reporter == null:
+		return
+
+	_define_wait -= delta
+	# Clamped, so an interval shortened after start takes effect now rather than after the
+	# old one runs out -- a tracker placed through a DotNodeRef has started before its host
+	# gets to configure it.
+	_report_left = minf(_report_left, report_interval) - delta
+	if _report_left > 0.0:
+		return
+
+	_report_left = report_interval
+	# Not awaited: a send is a network round trip and this is a frame. [member _reporting]
+	# keeps a slow one from being overlapped by the next tick.
+	report()
+
+
+## Declares the catalogue if that is still due, then sends every queued unlock.
+##
+## Called on [member report_interval] while [member report_to_backbone] is on. A host
+## can also await it itself -- before a shutdown, say, so the last round's unlocks are
+## not left in the queue. Returns what [method DotAchievementReporter.flush] returned,
+## or success(0) when there was nothing to do.
+func report() -> DotResult:
+	if reporter == null or catalogue == null or _reporting:
+		return DotResult.success(0)
+
+	if not reporter.is_available():
+		# The reporter says so itself, once, when it has something queued and nobody to
+		# send it to. Declaring the catalogue waits for a client to exist.
+		return await reporter.flush()
+
+	_reporting = true
+
+	if _define_due and _define_wait <= 0.0:
+		var declared: DotResult = await reporter.define(catalogue, report_app)
+		if declared.ok:
+			_define_due = false
+		elif declared.error != null and declared.error.is_retryable():
+			_define_backoff = clampf(maxf(_define_backoff * 2.0, report_interval), 0.0, 600.0)
+			_define_wait = _define_backoff
+		else:
+			_define_due = false
+
+	var res: DotResult = await reporter.flush()
+	_reporting = false
+	return res
 
 
 # --- Players ---------------------------------------------------------------
@@ -448,6 +526,7 @@ func describe() -> Dictionary:
 		"players": _players.size(),
 		"store": store.get_class() if store != null else "",
 		"reporting": report_to_backbone,
+		"reporter": reporter.describe() if reporter != null else {},
 	}
 
 
@@ -457,6 +536,9 @@ func describe_lines() -> PackedStringArray:
 
 	if catalogue != null:
 		out.append_array(catalogue.describe_lines())
+
+	if report_to_backbone and reporter != null:
+		out.append_array(reporter.describe_lines())
 
 	for player in _players.keys():
 		var progress: DotAchievementProgress = _players[player]

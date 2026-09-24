@@ -123,6 +123,8 @@ dot-stats' both, and every request either would have made would have been refuse
 Reading the two sides side by side is cheaper than a socket, and there is no other
 side to read yet. **Leave `report_to_backbone` off until there is.**
 
+**The tracker drives the reporter; nothing else does.** With `report_to_backbone` on, `DotAchievementTracker` calls `report()` every `report_interval` seconds (10 by default): it declares the catalogue once (retried on a doubling delay while the backbone is unreachable, abandoned after a refusal it will not retry) and then flushes the queue. Until 2026-09-24 nothing called `define()` or `flush()` at all, so every unlock sat in the queue until `queue_limit` dropped it. The tracker is the owner because it is the node a host already places and the family has no autoload to hang a timer on. A host may `await tracker.report()` itself before shutting down, so the last round's unlocks are not left queued.
+
 The reporter refuses a `backbone:`-prefixed account id as a player key before it
 leaves the process, which is dot-stats' rule and dot-user's reason: an operator must
 not be able to correlate their players across servers, and a report carrying an
@@ -143,7 +145,7 @@ find . -name '*.gd' -not -path './.godot/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"
 done
 godot --headless --path . res://examples/achievements_selftest.tscn
-# 11 sections, 136 checks, all offline. Exits non-zero on any failure.
+# 12 sections, 147 checks, all offline. Exits non-zero on any failure.
 ```
 
 ## Things deliberately not here
