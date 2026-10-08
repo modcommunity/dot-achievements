@@ -106,6 +106,17 @@ what the stat touches.
   file per player under `user://` on a dedicated server is one nobody notices until
   the disk is full.
 
+## SQL storage, through dot-sql
+
+`DotAchievementStoreSql` is the store for a community whose servers share progress. It holds its driver **untyped** and asks it for `query`, `batch`, `upsert_sql`, `dialect` and `migrate`, so no file in the addon names a dot-sql class and the addon parses without it; dot-sql is linked into `addons/` (gitignored) only for the suites. Its tables are `DotAchievementSqlSchema`'s plain-dictionary specs, rendered per dialect by the driver, and a database written by a newer build is refused at `open()` rather than read and saved back.
+
+- **Two narrow tables, not a JSON column.** A `progress` column holding the file store's document would be the shortest SQL store there is, and the one nobody can ask "how many have earned this" or "who was first" without parsing every row. `(achievement, unlocked_at)` is indexed for exactly that.
+- **A load goes through `DotAchievementProgress.from_dictionary`**, the file store's own parser, so the two cannot disagree about what a progress is. The points total is not stored; the tracker recounts it on load, as it already does.
+- **A save is the whole progress, as one batch**: upsert every held number, insert-if-absent every unlock (an unlock's time is never rewritten), then delete what the progress no longer holds — which is how a revocation reaches the table. Deletes last, so a batch cut off on a driver without transactions leaves a superset rather than a player missing what they had.
+- **Saves of one player are serialised**, and the snapshot is taken after the wait. The tracker saves on an unlock *without* awaiting (it is in the middle of a game's scoring) and the autosave saves the same player again; over a network the two can land in either order, and the older one landing second would delete the unlock the newer one just wrote. The `SlowDriver` check in the suite fails with the wait removed.
+
+A store that is not open fails the load with `CODE_STATE` — a failure, never a fresh player — for the reason everything above says.
+
 ## The backbone half does not exist yet
 
 `DotAchievementReporter` speaks three routes that **website-city does not have**:
@@ -145,8 +156,14 @@ find . -name '*.gd' -not -path './.godot/*' | while read f; do
     godot --headless --path . --check-only --script "res://${f#./}"
 done
 godot --headless --path . res://examples/achievements_selftest.tscn
-# 12 sections, 147 checks, all offline. Exits non-zero on any failure.
+# 13 sections, 172 checks, all offline. Exits non-zero on any failure.
+
+# The SQL store against real databases, through dot-sql's gateway. SQLite always;
+# Postgres and MySQL/MariaDB when DOT_SQL_PG_DSN / DOT_SQL_MYSQL_DSN are set.
+../dot-sql/tools/test_live.sh . res://examples/achievements_sql_live.tscn   # 12 checks per dialect
 ```
+
+The suite prints two `ERR achievements … could not be read` lines in its SQL section on every green run, and they are the point: one is a store that was never opened and one a read failure, each asserted to be **reported as a failed load** rather than handed back as a blank player. The live scene has run green on SQLite, Postgres 17 and MariaDB 11.8 (2026-10-08), including a tracker that earns an achievement in one session and finds it in the next.
 
 ## Things deliberately not here
 
@@ -158,7 +175,7 @@ godot --headless --path . res://examples/achievements_selftest.tscn
   whose condition is another achievement, and a store holding one and not the other
   then disagrees with itself.
 - **Cross-server totals.** A tracker is one deployment's. Two servers sharing progress
-  share a `DotAchievementStore`, which is the seam that exists for it.
+  share a `DotAchievementStore`, which is the seam that exists for it — `DotAchievementStoreSql` over one database is the one that ships.
 - **Anti-cheat.** A server that files a reading is trusted to have meant it. Nothing
   here can tell an earned kill from an invented one, and pretending otherwise would be
   worse than saying so.

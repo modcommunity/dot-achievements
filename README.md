@@ -12,7 +12,7 @@ This asset, along with all the others, was built initially with **Claude Code** 
 I intend on reviewing code, testing, and editing documentation regularly. If you're interested in helping out, please let me know!
 
 ## Achievements
-**Rules over per-player numbers, declared once.** Counters, bests, tiers, hidden and secret entries, progress bars that do not lie, a pluggable store, and a batched reporter for the TMC backbone.
+**Rules over per-player numbers, declared once.** Counters, bests, tiers, hidden and secret entries, progress bars that do not lie, a pluggable store (memory, a file per player, or SQL), and a batched reporter for the TMC backbone.
 
 ## Why
 
@@ -61,6 +61,16 @@ add_child(link)
 
 dot-stats' `recorded` signal carries a player's **session** total, and an achievement is about a lifetime. Wiring the signal straight into `record()` adds the running session total on every kill: two after the second, five after the third, nine after the fourth. The link holds a baseline and files the difference, and treats a total that goes down as a new session rather than as a negative delta.
 
+## In a database
+
+```gdscript
+var store := DotAchievementStoreSql.new(driver)   # any dot-sql driver
+await store.open()                                # creates or migrates its two tables
+tracker.store = store
+```
+
+For servers that share progress: SQLite, Postgres or MySQL/MariaDB through [dot-sql](https://github.com/modcommunity/dot-sql), reached duck-typed so dot-achievements parses without it. A row per held number and a row per unlock (`dot_achievement_values`, `dot_achievement_unlocks`, both names configurable) rather than one JSON blob per player, so "how many have earned this" is a query and not a scan. A save writes the whole progress as one batch, never rewrites when something was earned, and two saves of one player are run one after the other so the older can never land last.
+
 ## Showing them
 
 ```gdscript
@@ -75,7 +85,10 @@ Hidden entries are absent until earned, and secret ones arrive without their des
 ```bash
 godot --headless --path . --import
 godot --headless --path . res://examples/achievements_selftest.tscn
-# 136 checks, all offline. Exits non-zero on any failure.
+# 13 sections, 172 checks, all offline. Exits non-zero on any failure.
+
+# the SQL store against real SQLite, Postgres and MariaDB (dot-sql linked in addons/)
+../dot-sql/tools/test_live.sh . res://examples/achievements_sql_live.tscn
 ```
 
 ## Licence
