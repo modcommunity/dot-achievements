@@ -3,34 +3,38 @@ extends RefCounted
 
 ## Sends unlocks to the TMC backbone, in batches, through a client it never names.
 ##
-## [b]The endpoint this speaks does not exist in website-city yet, and saying so is
-## the point of this paragraph.[/b] dot-stats is the family's precedent for the other
-## way round — its `stats/*` routes were written alongside the addon — and the lesson
-## from every reporter that came before it is the same one: dot-leaderboard's and
-## dot-stats' reporters were both found sending their own file formats where the
-## backbone's schemas expected something else, and every request either would have
-## made would have been refused. Reading the two sides side by side is cheaper than a
-## socket.
-##
-## So the contract is stated here, in full, and a deployment either implements it or
-## leaves [member DotAchievementTracker.report_to_backbone] off:
+## website-city serves the three routes below, written against this class and checked
+## side by side with it (its `~/types/integration/achievements.ts`, whose unit test is
+## fed bodies captured from this reporter). The lesson that made that check a rule:
+## dot-leaderboard's and dot-stats' reporters were both found sending their own file
+## formats where the backbone's schemas expected something else, and every request
+## either would have made would have been refused.
 ##
 ## [codeblock]
-## POST /api/integration/v1/achievements/define
+## POST /api/integration/v1/achievements/define        (ACHIEVEMENTS_WRITE)
 ##   { "app": "<id>", "achievements": [ <DotAchievement.to_dictionary()>, ... ] }
+##   -> { "ok": true, "created": n, "updated": n, "unchanged": n, "refused"?: [...] }
 ##
-## POST /api/integration/v1/achievements/unlock
+## POST /api/integration/v1/achievements/unlock        (ACHIEVEMENTS_WRITE)
 ##   { "unlocks": [ { "player": "<pseudonymous key>",
 ##                    "key": "<achievement id>",
 ##                    "unlockedAt": <unix seconds> }, ... ] }
+##   -> { "ok": true, "unlocked": n, "already": n, "refused"?: [...] }
 ##
-## GET  /api/integration/v1/achievements/player?player=<key>
+## GET  /api/integration/v1/achievements/player?player=<key>   (ACHIEVEMENTS_READ)
+##   -> { "ok": true, "player": "<key>", "points": n,
+##        "unlocks": [ { "key", "name", "description", "points", "category",
+##                       "icon", "unlockedAt" }, ... ] }
 ## [/codeblock]
 ##
-## Field names are the backbone's convention — [code]key[/code] and
-## [code]unlockedAt[/code], not [code]id[/code] and [code]at[/code] — because that is
-## the shape its stats routes already use and the two disagreeing is the exact bug
-## named above.
+## [code]define[/code] sends the catalogue in this addon's own shape ([code]id[/code],
+## [code]require_all[/code]); the site takes it as sent, and also accepts
+## [code]key[/code] for [code]id[/code]. [code]app[/code] is ignored there: the
+## credential decides whose achievements these are. [code]unlock[/code] uses the
+## backbone's field names, [code]key[/code] and [code]unlockedAt[/code]. Both writes
+## are idempotent, so a retried batch is harmless. An unlock for an achievement the
+## site has no definition for is named in [code]refused[/code] on a 200, and
+## [method flush] logs it at ERROR, since those unlocks are gone.
 ##
 ## [b]A player key is a pseudonym, never an account id.[/b] Same rule dot-stats
 ## enforces and for the same reason: dot-user's whole design is that an operator
@@ -241,6 +245,15 @@ func flush() -> DotResult:
 				})
 
 			return res.wrap("Could not report achievement unlocks.")
+
+		# A 200 can still carry refusals: the backbone names every unlock whose
+		# achievement it has no definition for (a define that failed, or an id the
+		# catalogue does not hold) and applies the rest. Those unlocks are gone, and
+		# without this line nothing on this side would ever say so.
+		if res.value is Dictionary and (res.value as Dictionary).get("refused") is Array:
+			DotLog.error(CHANNEL, "the backbone refused some unlocks; declare the catalogue first", {
+				"refused": (res.value as Dictionary)["refused"], "defined": _defined,
+			})
 
 		sent += batch.size()
 		total += batch.size()

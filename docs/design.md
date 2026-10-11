@@ -58,7 +58,7 @@ A reading arrives and something has to decide which achievements it could have m
 
 ## The backbone reporter
 
-`DotAchievementReporter` speaks three routes that **website-city does not have yet**:
+`DotAchievementReporter` speaks three routes that website-city serves (`src/app/api/integration/v1/achievements/*`, scopes `ACHIEVEMENTS_WRITE` and `ACHIEVEMENTS_READ`; enrolled servers get the write scope):
 
 ```
 POST /api/integration/v1/achievements/define
@@ -66,7 +66,9 @@ POST /api/integration/v1/achievements/unlock
 GET  /api/integration/v1/achievements/player
 ```
 
-Field names follow the backbone's existing convention (`key`, `unlockedAt`) rather than this addon's file format, because the family has twice found a reporter sending its own shape where a schema expected another (dot-leaderboard's and dot-stats'), and every request either would have made would have been refused. Reading the two sides side by side is cheaper than a socket, and there is no other side to read yet. **Leave `report_to_backbone` off until there is.**
+`define` sends the catalogue in this addon's own shape, `DotAchievement.to_dictionary()` (`id`, `require_all`, `icon`, rules as `{stat, op, value, merge}` with the lower-case names), and the site takes exactly that; it also accepts `key` for `id`, and ignores `app` because the credential names the owner. `unlock` uses the backbone's field names (`player`, `key`, `unlockedAt` in Unix seconds). The two sides were checked side by side: the site's schema test is fed bodies captured from this reporter over a real game's catalogue, and the reporter has been driven through dot-auth's `DotBackboneClient` against a running site. Do that again after changing either side, because the family has twice found a reporter sending its own shape where a schema expected another (dot-leaderboard's and dot-stats'), and every request either would have made would have been refused.
+
+Both writes are idempotent: a re-sent define changes nothing, and an unlock already on file only ever moves its time earlier. An unlock for an achievement the site has no definition for is named in `refused` on a 200 while the rest applies; `flush()` logs it at ERROR, because the tracker declares before it flushes and a refusal therefore means a define that failed or an id missing from the catalogue.
 
 **The tracker drives the reporter; nothing else does.** With `report_to_backbone` on, `DotAchievementTracker` calls `report()` every `report_interval` seconds (10 by default): it declares the catalogue once (retried on a doubling delay while the backbone is unreachable, abandoned after a refusal it will not retry) and then flushes the queue. The tracker is the owner because it is the node a host already places and the family has no autoload to hang a timer on. A host may `await tracker.report()` itself before shutting down, so the last round's unlocks are not left queued.
 

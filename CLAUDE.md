@@ -50,9 +50,6 @@ The suite prints two `ERR achievements … could not be read` lines in its SQL s
 - File store names are slug plus hash of the whole key; the tracker defaults to memory; file writes call `DotWeb.sync_filesystem()`. [design](docs/design.md#details-that-look-arbitrary-and-are-not)
 - The SQL store names no dot-sql class, saves the whole progress as one batch with deletes last, and serialises saves per player. [design](docs/design.md#sql-storage-through-dot-sql)
 - Never send a `backbone:` account id as a player key. [design](docs/design.md#the-backbone-reporter)
-
-## Open items
-
-- **The backbone routes do not exist in website-city yet** (`/api/integration/v1/achievements/define`, `/unlock`, `/player`). Leave `report_to_backbone` off until they do, and read the site's schema side by side before turning it on. [design](docs/design.md#the-backbone-reporter)
+- The define and unlock bodies are website-city's `~/types/integration/achievements.ts` schemas; change both sides together and re-check them side by side. [design](docs/design.md#the-backbone-reporter)
 
 Deliberately not here: art and toasts, counting, tier implication, cross-server totals beyond a shared store, anti-cheat. [design](docs/design.md#deliberately-not-here)
