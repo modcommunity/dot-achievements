@@ -654,7 +654,7 @@ func _test_stats_link() -> void:
 	_check(link.describe()["connected"], "the link connects")
 
 	# dot-stats emits the SESSION total, not the reading. Wiring the signal straight
-	# into record() would add 1, then 2, then 3 — nine after four kills.
+	# into record() would add 1, then 2, then 3, then 4 — ten after four kills.
 	for i in 4:
 		stats.record(&"ada", &"kills", 1.0)
 

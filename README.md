@@ -59,7 +59,7 @@ link.stats = stats_tracker
 add_child(link)
 ```
 
-dot-stats' `recorded` signal carries a player's **session** total, and an achievement is about a lifetime. Wiring the signal straight into `record()` adds the running session total on every kill: two after the second, five after the third, nine after the fourth. The link holds a baseline and files the difference, and treats a total that goes down as a new session rather than as a negative delta.
+dot-stats' `recorded` signal carries a player's **session** total, and an achievement is about a lifetime. Wiring the signal straight into `record()` adds the running session total on every kill: three after the second, six after the third, ten after the fourth. The link holds a baseline and files the difference, and treats a total that goes down as a new session rather than as a negative delta.
 
 ## In a database
 

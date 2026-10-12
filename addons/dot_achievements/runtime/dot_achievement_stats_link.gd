@@ -8,8 +8,8 @@ extends Node
 ## not the reading that caused it — its whole design is that a session is what a
 ## server counts and a delta is what it reports. An achievement is about a lifetime.
 ## Wiring the signal straight into [method DotAchievementTracker.record] therefore
-## adds the running session total to the lifetime total on every single kill: two
-## after the second kill, five after the third, nine after the fourth.
+## adds the running session total to the lifetime total on every single kill: three
+## after the second kill, six after the third, ten after the fourth.
 ##
 ## So this holds the last session value it saw per player and stat, and files the
 ## difference. A value that goes [i]down[/i] is a new session — dot-stats begins a
