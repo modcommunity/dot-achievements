@@ -1,0 +1,8 @@
+# size
+# Baselines only shrink: scripts/<gate> --update lowers or drops entries and refuses to add.
+addons/dot_achievements/net/dot_achievement_reporter.gd::flush	82
+examples/achievements_selftest.gd	1196
+examples/achievements_selftest.gd::_test_achievements	89
+examples/achievements_selftest.gd::_test_sql_store	182
+examples/achievements_selftest.gd::_test_tracker_reports	105
+examples/achievements_sql_live.gd::_ready	119
