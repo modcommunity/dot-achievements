@@ -34,7 +34,7 @@ Paths except `examples/` are in `addons/dot_achievements/`.
 
 ## Running and testing
 
-The family's two steps ([game-dev/CLAUDE.md](../../CLAUDE.md#validating-anything)), then `godot --headless --path . res://examples/achievements_selftest.tscn`. The SQL store against real databases, through dot-sql's gateway (SQLite always; Postgres and MySQL/MariaDB when `DOT_SQL_PG_DSN` / `DOT_SQL_MYSQL_DSN` are set): `../dot-sql/tools/test_live.sh . res://examples/achievements_sql_live.tscn`.
+The family's two steps ([family CLAUDE.md](../../CLAUDE.md#validating-anything)), then `godot --headless --path . res://examples/achievements_selftest.tscn`. The SQL store against real databases, through dot-sql's gateway (SQLite always; Postgres and MySQL/MariaDB when `DOT_SQL_PG_DSN` / `DOT_SQL_MYSQL_DSN` are set): `../dot-sql/tools/test_live.sh . res://examples/achievements_sql_live.tscn`.
 
 The suite prints two `ERR achievements … could not be read` lines in its SQL section on every green run. They are the point: a store never opened and a read failure, each asserted to be reported as a failed load rather than a blank player.
 
