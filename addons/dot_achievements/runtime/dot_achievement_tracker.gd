@@ -81,8 +81,11 @@ signal save_failed(player: String, error: DotError)
 ## The app id sent with the catalogue declaration. Empty sends none.
 @export var report_app: String = ""
 
-## Where progress lives. Defaults to memory — see [DotAchievementStoreMemory] for
-## why that rather than a file.
+## Where the default file store keeps progress (user:// is already per game).
+@export var store_directory: String = "user://dot_achievements"
+
+## Where progress lives. Left null, start() makes a [DotAchievementStoreFile] in
+## [member store_directory]; assign [DotAchievementStoreMemory] for throwaway runs.
 var store: DotAchievementStore = null
 
 ## The backbone reporter. Created on start; needs a client to do anything.
@@ -133,7 +136,7 @@ func start() -> DotResult:
 		return valid.wrap("The achievement catalogue is not usable.")
 
 	if store == null:
-		store = DotAchievementStoreMemory.new()
+		store = DotAchievementStoreFile.new(store_directory)
 
 	if reporter == null:
 		reporter = DotAchievementReporter.new()

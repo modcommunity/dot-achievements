@@ -12,8 +12,8 @@ extends Node
 ## godot --headless --path . res://examples/achievements_selftest.tscn
 ## [/codeblock]
 
-const SECTIONS := 13
-const CHECKS := 172
+const SECTIONS := 14
+const CHECKS := 175
 
 var _passed := 0
 var _failed := 0
@@ -99,6 +99,7 @@ func _run() -> void:
 	await _test_reporter()
 	await _test_tracker_reports()
 	await _test_saving()
+	await _test_default_store()
 	await _test_sql_store()
 
 	_line("")
@@ -964,6 +965,29 @@ func _catalogue() -> DotAchievementCatalogue:
 	return DotAchievementCatalogue.of([
 		k10, k100, flawless, fast, hidden, manual
 	] as Array[DotAchievement])
+
+
+func _test_default_store() -> void:
+	_section("default store")
+	var dir := "user://dot_achievements_default_selftest"
+	DotPaths.remove_tree(dir)
+	var tracker := DotAchievementTracker.new()
+	tracker.register_as = &""
+	tracker.catalogue = _catalogue()
+	tracker.store_directory = dir
+	tracker.autosave_interval = 0.0
+	add_child(tracker)
+	_check(tracker.start().ok, "a tracker with no store starts")
+	_check(
+		tracker.store is DotAchievementStoreFile,
+		"the default store is a file store, not memory"
+	)
+	var f := tracker.store as DotAchievementStoreFile
+	DotPaths.write_text(f.path_for("bad"), "{ nope")
+	var bad: DotResult = await f.load_progress("bad")
+	_check(not bad.ok, "the default store refuses a corrupt file instead of reading it empty")
+	tracker.queue_free()
+	DotPaths.remove_tree(dir)
 
 
 func _tracker() -> DotAchievementTracker:
