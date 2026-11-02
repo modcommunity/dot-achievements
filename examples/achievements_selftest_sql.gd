@@ -91,6 +91,16 @@ func _test_sql_store() -> void:
 	)
 	_check(progress != null and not progress.dirty, "and a loaded progress is not dirty")
 
+	await _test_sql_save()
+	await _test_sql_failures()
+
+
+## Saving: upserts, then insert-if-absent unlocks, then the deletes.
+func _test_sql_save() -> void:
+	var driver := DotSqlDriverRecording.new(DotSqlDialect.Kind.POSTGRES)
+	driver.answers = {"SELECT version FROM": []}
+	var store := DotAchievementStoreSql.new(driver)
+	await store.open()
 	driver.clear()
 	driver.answers = {}
 	driver.rows = []
@@ -100,12 +110,7 @@ func _test_sql_store() -> void:
 		"a player with no rows is a fresh player, not a failure"
 	)
 
-	# Saving: upserts, then insert-if-absent unlocks, then the deletes.
-	var saving := DotAchievementProgress.new()
-	saving.set_value(&"kills", 40.0)
-	saving.set_value(&"bad", NAN)
-	saving.mark_unlocked(&"k10", 1700000001, 5)
-	saving.mark_unlocked(&"fast", 1700000002, 10)
+	var saving := _sample_progress()
 	driver.clear()
 	var saved: DotResult = await store.save_progress("ada", saving)
 	var sqls: Array = driver.statements.map(func(s): return str(s["sql"]))
@@ -158,7 +163,14 @@ func _test_sql_store() -> void:
 		"on MySQL the insert-if-absent is a no-op update, not INSERT IGNORE"
 	)
 
-	# Failures are failures.
+
+## Failures are failures, and saves of one player never interleave.
+func _test_sql_failures() -> void:
+	var driver := DotSqlDriverRecording.new(DotSqlDialect.Kind.POSTGRES)
+	driver.answers = {"SELECT version FROM": []}
+	var store := DotAchievementStoreSql.new(driver)
+	await store.open()
+	var saving := _sample_progress()
 	driver.clear()
 	driver.fail_next = "connection reset"
 	var failed_load: DotResult = await store.load_progress("ada")
@@ -203,6 +215,15 @@ func _test_sql_store() -> void:
 		last_delete.size() == 2 and (last_delete[1]["params"] as Array) == ["ada", "k10", "fast"],
 		"and the second, which runs last, writes the newest state"
 	)
+
+
+func _sample_progress() -> DotAchievementProgress:
+	var saving := DotAchievementProgress.new()
+	saving.set_value(&"kills", 40.0)
+	saving.set_value(&"bad", NAN)
+	saving.mark_unlocked(&"k10", 1700000001, 5)
+	saving.mark_unlocked(&"fast", 1700000002, 10)
+	return saving
 
 
 # --- Harness ---------------------------------------------------------------
