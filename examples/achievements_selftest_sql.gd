@@ -19,11 +19,8 @@ class SlowDriver extends DotSqlDriverRecording:
 		return await super(sql, params)
 
 
-## The SQL store against a driver that records what it is asked.
-##
-## Which statements, in what order, with which values bound where, and how rows map back.
-## examples/achievements_sql_live.tscn runs the same store against real SQLite, Postgres and
-## MariaDB through dot-sql's gateway, which is what says the SQL is valid.
+## The SQL store against a recording driver: statement order, bound values, row mapping.
+## achievements_sql_live.tscn checks the SQL itself against real databases.
 func _test_sql_store() -> void:
 	_section("the SQL store, against a driver that records what it is asked")
 
@@ -226,7 +223,7 @@ func _sample_progress() -> DotAchievementProgress:
 	return saving
 
 
-# --- Harness ---------------------------------------------------------------
+# Harness
 
 func _section(title: String) -> void:
 	_section_count += 1
