@@ -85,7 +85,7 @@ Hidden entries are absent until earned, and secret ones arrive without their des
 ```bash
 godot --headless --path . --import
 godot --headless --path . res://examples/achievements_selftest.tscn
-# 14 sections, 175 checks, all offline. Exits non-zero on any failure.
+# Offline. Exits non-zero on any failure.
 
 # the SQL store against real SQLite, Postgres and MariaDB (dot-sql linked in addons/)
 ../dot-sql/tools/test_live.sh . res://examples/achievements_sql_live.tscn
