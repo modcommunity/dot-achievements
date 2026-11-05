@@ -80,6 +80,21 @@ for row in tracker.listing(player_key):
 
 Hidden entries are absent until earned, and secret ones arrive without their description. The filtering happens here rather than in a UI, because a description withheld by the interface that drew it was still sent to the client.
 
+## The achievement catalogue file
+
+A game's catalogue can be written as the site's `dot-achievement-defs` JSON, so the site owner imports it from the dashboard (or a deploy posts it) instead of waiting for a server to boot and declare it. Run it from the game project with the static method that returns the game's `DotAchievementCatalogue`; `tools/export_site_defs.gd` takes `--source`, `--method`, `--out` (default `deployment/achievement-defs.json`), `--game` and `--check`.
+
+`--check` writes nothing and exits 1 when the file is stale. `--game <id>` pins the site app id, left out by default so one file imports into any environment. The file is `DotAchievementCatalogue.to_site_defs()`:
+
+```json
+{"format": "dot-achievement-defs", "version": 1, "achievements": [
+  {"key": "k100", "name": "Centurion", "description": "", "points": 10, "category": "", "icon": "",
+   "hidden": false, "secret": false, "series": "kills", "tier": 1, "requireAll": true,
+   "rules": [{"stat": "kills", "op": "at_least", "value": 100, "merge": "sum"}]}]}
+```
+
+`op` is one of `at_least`, `at_most`, `equals`, `not_equals`; `merge` one of `sum`, `latest`, `highest`, `lowest`. Importing is a merge keyed by `key`: achievements the file does not mention, and every unlock, are kept.
+
 ## Validating
 
 ```bash
