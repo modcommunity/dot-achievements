@@ -208,6 +208,29 @@ func to_dictionary() -> Dictionary:
 	return {"version": 1, "achievements": rows}
 
 
+## The site's `dot-achievement-defs` document; [param game] 0 leaves the app id out.
+func to_site_defs(game: int = 0) -> Dictionary:
+	var rows: Array = []
+	for a in achievements:
+		if a == null:
+			continue
+		var rules: Array = []
+		for rule in a.requirements:
+			if rule != null:
+				rules.append(rule.to_dictionary())
+		rows.append({
+			"key": String(a.id), "name": a.display_name, "description": a.description,
+			"points": a.points, "category": String(a.category), "icon": String(a.icon_id),
+			"hidden": a.hidden, "secret": a.secret, "series": String(a.series), "tier": a.tier,
+			"requireAll": a.require_all, "rules": rules,
+		})
+	var out := {"format": "dot-achievement-defs", "version": 1}
+	if game > 0:
+		out["game"] = game
+	out["achievements"] = rows
+	return out
+
+
 static func from_dictionary(data: Dictionary) -> DotResult:
 	var rows: Variant = data.get("achievements")
 	if typeof(rows) != TYPE_ARRAY:

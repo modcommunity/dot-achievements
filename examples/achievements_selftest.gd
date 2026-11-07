@@ -13,7 +13,7 @@ extends "res://examples/achievements_selftest_sql.gd"
 ## [/codeblock]
 
 const SECTIONS := 14
-const CHECKS := 175
+const CHECKS := 178
 
 
 ## A stand-in for dot-stats' tracker, which this addon never names.
@@ -298,6 +298,11 @@ func _test_catalogue() -> void:
 	var catalogue := _catalogue()
 	var valid := catalogue.validate()
 	_check(valid.ok, "a catalogue validates")
+	var site := catalogue.to_site_defs()
+	_check(site["format"] == "dot-achievement-defs" and site["version"] == 1, "the site document names its format and version")
+	_check(not site.has("game") and catalogue.to_site_defs(7)["game"] == 7, "the app id is left out unless asked for")
+	var first: Dictionary = (site["achievements"] as Array)[0]
+	_check(first.has("key") and first.has("requireAll") and (first["rules"] as Array).size() > 0, "an exported achievement carries its key and rules")
 
 	_check(catalogue.find(&"k100") != null, "achievements are found by id")
 	_check(catalogue.find(&"nope") == null, "and a missing one is null")
