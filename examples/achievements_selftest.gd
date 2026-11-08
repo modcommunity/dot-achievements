@@ -13,7 +13,7 @@ extends "res://examples/achievements_selftest_sql.gd"
 ## [/codeblock]
 
 const SECTIONS := 14
-const CHECKS := 178
+const CHECKS := 180
 
 
 ## A stand-in for dot-stats' tracker, which this addon never names.
