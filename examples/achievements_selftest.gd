@@ -13,7 +13,7 @@ extends "res://examples/achievements_selftest_sql.gd"
 ## [/codeblock]
 
 const SECTIONS := 14
-const CHECKS := 178
+const CHECKS := 180
 
 
 ## A stand-in for dot-stats' tracker, which this addon never names.
@@ -680,6 +680,21 @@ func _test_stats_link() -> void:
 		is_equal_approx(progress.value_of(&"best_time"), 12.0),
 		"a LOWEST stat is passed through rather than differenced"
 	)
+
+	# A game that files stats under another key maps it; unmapped keys pass through.
+	await tracker.begin("acct-1")
+	link.key_map[&"plat-1"] = &"acct-1"
+	stats.record(&"plat-1", &"kills", 1.0)
+	stats.record(&"plat-1", &"kills", 1.0)
+	_check(
+		is_equal_approx(tracker.progress_of("acct-1").value_of(&"kills"), 2.0),
+		"a mapped stats key is filed under the achievement key, still differenced"
+	)
+	_check(
+		is_equal_approx(progress.value_of(&"kills"), 5.0),
+		"and the unmapped player is untouched"
+	)
+	link.key_map.erase(&"plat-1")
 
 	var unknown := DotAchievementStatsLink.new()
 	unknown.tracker = tracker

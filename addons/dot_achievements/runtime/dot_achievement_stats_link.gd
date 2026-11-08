@@ -42,6 +42,12 @@ var stats: Object = null
 ## Registry name to find one under when [member stats] is not set.
 var stats_service: StringName = &"dot_stats_tracker"
 
+## stats key -> achievement key, for a game that files its stats under one key and its
+## records under another. A reading under a key listed here is filed under the mapped
+## key (baselines too, so [method forget] takes the achievement key); a key not listed
+## passes through. The game adds and erases entries as players begin and leave.
+var key_map: Dictionary = {}
+
 var _last_session: Dictionary = {}
 var _connected: bool = false
 
@@ -97,7 +103,7 @@ func forget(player: String) -> void:
 
 
 func _on_recorded(player_id: StringName, stat_id: StringName, value: float) -> void:
-	var player := String(player_id)
+	var player := String(key_map.get(player_id, player_id))
 
 	if not tracker.has(player):
 		# Not begun here. Silently ignored rather than warned per reading: a game may
