@@ -18,6 +18,8 @@ dot-stats emits `recorded(player, stat, value)` where `value` is the player's ru
 
 `DotAchievementStatsLink` holds the last session value per player and stat and files the difference. A value that goes **down** is a new session, not a negative delta. Only `SUM` stats are differenced: a personal best is an absolute in both systems and differencing one would be meaningless.
 
+A game that files stats under one key and achievements under another sets `link.key_map` (stats key to achievement key); a reading under a mapped key is filed, and differenced, under the mapped one.
+
 ## A player must be begun
 
 `DotAchievementTracker.record` refuses a player who has not been loaded, with `CODE_STATE`. dot-stats begins a player implicitly and is right to: a session tracker starting from zero is starting from the truth. Here it would evaluate a returning player's lifetime achievements against a blank slate, awarding their first-kill achievement again and then writing that record back over the real one.
